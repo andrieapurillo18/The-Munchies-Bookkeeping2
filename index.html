@@ -67,6 +67,8 @@
     .bad { color: red; font-weight: bold; }
     .small { font-size: 0.8em; }
   </style>
+  <!-- Add this in your <head> section -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 <header>📊 Bookkeeping App</header>
@@ -215,89 +217,91 @@ $('clearTxBtn').onclick=()=>{ $('txDate').value=''; $('txAmount').value=''; $('t
 $('resetBtn').onclick=()=>{ if(confirm("Clear all data?")){ initDefaultState(); populateAccounts(); render(); } };
 $('sampleBtn').onclick=()=>{ state.transactions=[{date:'2025-01-01',amount:10000,desc:'Owner Capital',debit:'Cash',credit:'Equity'},{date:'2025-01-05',amount:2000,desc:'Bought Ingredients',debit:'Inventory - Ingredients',credit:'Cash'},{date:'2025-01-06',amount:500,desc:'Bought Packaging',debit:'Inventory - Packaging',credit:'Cash'},{date:'2025-01-10',amount:3000,desc:'Sold Products',debit:'Cash',credit:'Sales'}]; saveState(); render(); };
 $('exportCsvBtn').onclick = () => {
-  let csv = "";
+  const wb = XLSX.utils.book_new();
 
-  // --- Journal ---
-  csv += "Journal Entries\nDate,Description,Debit,Credit,Amount\n";
+  // --- Journal Sheet ---
+  const journalData = [['Date','Description','Debit','Credit','Amount']];
   state.transactions.forEach(t => {
-    csv += `${t.date},${t.desc},${t.debit},${t.credit},${t.amount}\n`;
+    journalData.push([t.date, t.desc, t.debit, t.credit, t.amount]);
   });
-  csv += "\n";
+  const journalWS = XLSX.utils.aoa_to_sheet(journalData);
+  XLSX.utils.book_append_sheet(wb, journalWS, 'Journal');
 
-  // --- General Ledger ---
-  csv += "General Ledger\nAccount,Debits,Credits,Balance\n";
+  // --- Ledger Sheet ---
   let ledger = {};
-  state.accounts.forEach(a => ledger[a] = { debit: 0, credit: 0 });
+  state.accounts.forEach(a => ledger[a] = {debit:0, credit:0});
   state.transactions.forEach(t => {
     ledger[t.debit].debit += t.amount;
     ledger[t.credit].credit += t.amount;
   });
-  Object.entries(ledger).forEach(([a, b]) => {
-    const balance = b.debit - b.credit;
-    csv += `${a},${b.debit},${b.credit},${balance}\n`;
+  const ledgerData = [['Account','Debits','Credits','Balance']];
+  Object.entries(ledger).forEach(([a,b]) => {
+    ledgerData.push([a, b.debit, b.credit, b.debit - b.credit]);
   });
-  csv += "\n";
+  const ledgerWS = XLSX.utils.aoa_to_sheet(ledgerData);
+  XLSX.utils.book_append_sheet(wb, ledgerWS, 'Ledger');
 
-  // --- Trial Balance ---
-  csv += "Trial Balance\nAccount,Debit,Credit\n";
-  let debitTotal = 0, creditTotal = 0;
+  // --- Trial Balance Sheet ---
   let balances = {};
   state.accounts.forEach(a => balances[a] = 0);
   state.transactions.forEach(t => {
     balances[t.debit] += t.amount;
     balances[t.credit] -= t.amount;
   });
-  Object.entries(balances).forEach(([a, b]) => {
-    let d = 0, c = 0;
-    if (b >= 0) d = b; else c = -b;
-    debitTotal += d; creditTotal += c;
-    csv += `${a},${d},${c}\n`;
+  const trialData = [['Account','Debit','Credit']];
+  Object.entries(balances).forEach(([a,b]) => {
+    trialData.push([a, b>=0?b:0, b<0?-b:0]);
   });
-  csv += `Total,${debitTotal},${creditTotal}\n\n`;
+  const trialWS = XLSX.utils.aoa_to_sheet(trialData);
+  XLSX.utils.book_append_sheet(wb, trialWS, 'Trial Balance');
 
   // --- Income Statement ---
-  csv += "Income Statement\nItem,Amount\n";
-  let revenue = 0, expenses = 0, cogs = 0;
-  state.transactions.forEach(t => {
-    if (t.credit === 'Sales' || t.credit === 'Service Revenue') revenue += t.amount;
-    if (t.debit === 'Cost of Goods Sold') cogs += t.amount;
-    if (t.debit.endsWith('Expense')) expenses += t.amount;
+  let revenue=0, expenses=0, cogs=0;
+  state.transactions.forEach(t=>{
+    if(t.credit==='Sales'||t.credit==='Service Revenue') revenue+=t.amount;
+    if(t.debit==='Cost of Goods Sold') cogs+=t.amount;
+    if(t.debit.endsWith('Expense')) expenses+=t.amount;
   });
-  csv += `Revenue,${revenue}\nCost of Goods Sold,${cogs}\nExpenses,${expenses}\nNet Income,${revenue - cogs - expenses}\n\n`;
+  const incomeData = [
+    ['Item','Amount'],
+    ['Revenue', revenue],
+    ['Cost of Goods Sold', cogs],
+    ['Expenses', expenses],
+    ['Net Income', revenue - cogs - expenses]
+  ];
+  const incomeWS = XLSX.utils.aoa_to_sheet(incomeData);
+  XLSX.utils.book_append_sheet(wb, incomeWS, 'Income Statement');
 
   // --- Balance Sheet ---
-  csv += "Balance Sheet\nItem,Amount\n";
-  let assets = 0, liab = 0, equity = 0;
-  Object.entries(balances).forEach(([a, b]) => {
-    if (a === 'Cash' || a.startsWith('Accounts Receivable') || a.startsWith('Inventory') || a.startsWith('Prepaid')) assets += b;
-    if (a.endsWith('Payable') || a === 'Loans Payable') liab += -b;
-    if (a === 'Equity') equity += -b;
+  let assets=0, liab=0, equity=0;
+  Object.entries(balances).forEach(([a,b])=>{
+    if(a==='Cash'||a.startsWith('Accounts Receivable')||a.startsWith('Inventory')||a.startsWith('Prepaid')) assets+=b;
+    if(a.endsWith('Payable')||a==='Loans Payable') liab+=-b;
+    if(a==='Equity') equity+=-b;
   });
-  csv += `Assets,${assets}\nLiabilities,${liab}\nEquity,${equity}\nTotal,${assets}\n\n`;
+  const balanceData = [['Item','Amount'], ['Assets', assets], ['Liabilities', liab], ['Equity', equity], ['Total Assets', assets]];
+  const balanceWS = XLSX.utils.aoa_to_sheet(balanceData);
+  XLSX.utils.book_append_sheet(wb, balanceWS, 'Balance Sheet');
 
   // --- Cash Flow ---
-  csv += "Cash Flow Statement\nDate,Description,Cash In,Cash Out\n";
-  let cashIn = 0, cashOut = 0;
-  state.transactions.forEach(t => {
-    if (t.debit === state.cashAccount) {
-      cashIn += t.amount;
-      csv += `${t.date},${t.desc},${t.amount},\n`;
+  const cashData = [['Date','Description','Cash In','Cash Out']];
+  let cashIn=0, cashOut=0;
+  state.transactions.forEach(t=>{
+    if(t.debit===state.cashAccount){
+      cashIn+=t.amount;
+      cashData.push([t.date, t.desc, t.amount, '']);
     }
-    if (t.credit === state.cashAccount) {
-      cashOut += t.amount;
-      csv += `${t.date},${t.desc},,${t.amount}\n`;
+    if(t.credit===state.cashAccount){
+      cashOut+=t.amount;
+      cashData.push([t.date, t.desc, '', t.amount]);
     }
   });
-  csv += `Total,,${cashIn},${cashOut}\n`;
+  cashData.push(['Total','', cashIn, cashOut]);
+  const cashWS = XLSX.utils.aoa_to_sheet(cashData);
+  XLSX.utils.book_append_sheet(wb, cashWS, 'Cash Flow');
 
-  // Download CSV
-  const blob = new Blob([csv], { type: 'text/csv' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'bookkeeping_full.csv';
-  a.click();
-  URL.revokeObjectURL(url);
+  // --- Save Workbook ---
+  XLSX.writeFile(wb, 'Bookkeeping.xlsx');
 };
 $('defaultCash').onchange=()=>{ state.cashAccount=$('defaultCash').value; saveState(); render(); };
 $('syncBtn').onclick = () => {saveToGitHub(state.transactions); };
@@ -311,5 +315,6 @@ if('serviceWorker' in navigator){ navigator.serviceWorker.register('service-work
 </body>
 
 </html>
+
 
 
