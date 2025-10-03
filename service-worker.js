@@ -1,4 +1,4 @@
-const CACHE_NAME = "bookkeeping-cache-v4";
+const CACHE_NAME = "bookkeeping-cache-v5";
 const urlsToCache = [
   "/index.html",
   "/manifest.json",
@@ -34,6 +34,7 @@ self.addEventListener("fetch", event => {
     caches.match(event.request).then(response => response || fetch(event.request))
   );
 });
+
 
 
 
