@@ -150,6 +150,7 @@
     <button id="resetBtn">Reset All Data</button>
     <button id="sampleBtn">Load Sample</button>
     <button id="exportCsvBtn">Export CSV</button>
+    <button id="syncBtn">Sync to GitHub</button>
   </div>
 
 </div>
@@ -215,6 +216,7 @@ $('resetBtn').onclick=()=>{ if(confirm("Clear all data?")){ initDefaultState(); 
 $('sampleBtn').onclick=()=>{ state.transactions=[{date:'2025-01-01',amount:10000,desc:'Owner Capital',debit:'Cash',credit:'Equity'},{date:'2025-01-05',amount:2000,desc:'Bought Ingredients',debit:'Inventory - Ingredients',credit:'Cash'},{date:'2025-01-06',amount:500,desc:'Bought Packaging',debit:'Inventory - Packaging',credit:'Cash'},{date:'2025-01-10',amount:3000,desc:'Sold Products',debit:'Cash',credit:'Sales'}]; saveState(); render(); };
 $('exportCsvBtn').onclick=()=>{ let csv="Date,Description,Debit,Credit,Amount\n"; state.transactions.forEach(t=>csv+=`${t.date},${t.desc},${t.debit},${t.credit},${t.amount}\n`); const blob=new Blob([csv],{type:'text/csv'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='transactions.csv'; a.click(); URL.revokeObjectURL(url); };
 $('defaultCash').onchange=()=>{ state.cashAccount=$('defaultCash').value; saveState(); render(); };
+$('syncBtn').onclick = () => {saveToGitHub(state.transactions); };
 
 // Init
 loadState(); populateAccounts(); render();
@@ -223,4 +225,5 @@ loadState(); populateAccounts(); render();
 if('serviceWorker' in navigator){ navigator.serviceWorker.register('service-worker.js').then(()=>console.log('SW registered')).catch(err=>console.log('SW error',err)); }
 </script>
 </body>
+
 </html>
