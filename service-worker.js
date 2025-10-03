@@ -1,41 +1,36 @@
-const CACHE_NAME = "bookkeeping-cache-v2";
+const CACHE_NAME = "bookkeeping-cache-v1";
 const urlsToCache = [
-  "index.html",
-  "manifest.json",
-  "icon-192.png",
-  "icon-512.png"
+  "/index.html",
+  "/manifest.json",
+  "/icon-192.png",
+  "/icon-512.png"
 ];
 
-// Install SW and cache files
+// Install event: cache essential files
 self.addEventListener("install", event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache))
   );
-  self.skipWaiting();
+  self.skipWaiting(); // Activate SW immediately
 });
 
-// Activate SW and remove old caches
+// Activate event: remove old caches
 self.addEventListener("activate", event => {
   event.waitUntil(
-    caches.keys().then(cacheNames =>
+    caches.keys().then(keys =>
       Promise.all(
-        cacheNames.map(cache => {
-          if (cache !== CACHE_NAME) {
-            return caches.delete(cache);
-          }
+        keys.map(key => {
+          if (key !== CACHE_NAME) return caches.delete(key);
         })
       )
     )
   );
-  self.clients.claim();
+  self.clients.claim(); // Take control of all pages
 });
 
-// Fetch from cache, fallback to network
+// Fetch event: serve from cache first, fallback to network
 self.addEventListener("fetch", event => {
   event.respondWith(
-    caches.match(event.request).then(response => {
-      return response || fetch(event.request);
-    })
+    caches.match(event.request).then(response => response || fetch(event.request))
   );
-
 });
