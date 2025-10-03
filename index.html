@@ -309,12 +309,11 @@ $('syncBtn').onclick = () => {saveToGitHub(state.transactions); };
 // Init
 loadState(); populateAccounts(); render();
 
-// Register service worker
-if('serviceWorker' in navigator){ navigator.serviceWorker.register('service-worker.js').then(()=>console.log('SW registered')).catch(err=>console.log('SW error',err)); }
 </script>
 </body>
 
 </html>
+
 
 
 
