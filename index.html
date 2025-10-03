@@ -215,11 +215,90 @@ $('clearTxBtn').onclick=()=>{ $('txDate').value=''; $('txAmount').value=''; $('t
 $('resetBtn').onclick=()=>{ if(confirm("Clear all data?")){ initDefaultState(); populateAccounts(); render(); } };
 $('sampleBtn').onclick=()=>{ state.transactions=[{date:'2025-01-01',amount:10000,desc:'Owner Capital',debit:'Cash',credit:'Equity'},{date:'2025-01-05',amount:2000,desc:'Bought Ingredients',debit:'Inventory - Ingredients',credit:'Cash'},{date:'2025-01-06',amount:500,desc:'Bought Packaging',debit:'Inventory - Packaging',credit:'Cash'},{date:'2025-01-10',amount:3000,desc:'Sold Products',debit:'Cash',credit:'Sales'}]; saveState(); render(); };
 $('exportCsvBtn').onclick = () => {
-  let csv="Date,Description,Debit,Credit,Amount\n";
-  state.transactions.forEach(t=> csv+=`${t.date},${t.desc},${t.debit},${t.credit},${t.amount}\n`);
-  const blob=new Blob([csv],{type:'text/csv'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a'); a.href=url; a.download='transactions.csv'; a.click(); URL.revokeObjectURL(url); };
+  let csv = "";
+
+  // --- Journal ---
+  csv += "Journal Entries\nDate,Description,Debit,Credit,Amount\n";
+  state.transactions.forEach(t => {
+    csv += `${t.date},${t.desc},${t.debit},${t.credit},${t.amount}\n`;
+  });
+  csv += "\n";
+
+  // --- General Ledger ---
+  csv += "General Ledger\nAccount,Debits,Credits,Balance\n";
+  let ledger = {};
+  state.accounts.forEach(a => ledger[a] = { debit: 0, credit: 0 });
+  state.transactions.forEach(t => {
+    ledger[t.debit].debit += t.amount;
+    ledger[t.credit].credit += t.amount;
+  });
+  Object.entries(ledger).forEach(([a, b]) => {
+    const balance = b.debit - b.credit;
+    csv += `${a},${b.debit},${b.credit},${balance}\n`;
+  });
+  csv += "\n";
+
+  // --- Trial Balance ---
+  csv += "Trial Balance\nAccount,Debit,Credit\n";
+  let debitTotal = 0, creditTotal = 0;
+  let balances = {};
+  state.accounts.forEach(a => balances[a] = 0);
+  state.transactions.forEach(t => {
+    balances[t.debit] += t.amount;
+    balances[t.credit] -= t.amount;
+  });
+  Object.entries(balances).forEach(([a, b]) => {
+    let d = 0, c = 0;
+    if (b >= 0) d = b; else c = -b;
+    debitTotal += d; creditTotal += c;
+    csv += `${a},${d},${c}\n`;
+  });
+  csv += `Total,${debitTotal},${creditTotal}\n\n`;
+
+  // --- Income Statement ---
+  csv += "Income Statement\nItem,Amount\n";
+  let revenue = 0, expenses = 0, cogs = 0;
+  state.transactions.forEach(t => {
+    if (t.credit === 'Sales' || t.credit === 'Service Revenue') revenue += t.amount;
+    if (t.debit === 'Cost of Goods Sold') cogs += t.amount;
+    if (t.debit.endsWith('Expense')) expenses += t.amount;
+  });
+  csv += `Revenue,${revenue}\nCost of Goods Sold,${cogs}\nExpenses,${expenses}\nNet Income,${revenue - cogs - expenses}\n\n`;
+
+  // --- Balance Sheet ---
+  csv += "Balance Sheet\nItem,Amount\n";
+  let assets = 0, liab = 0, equity = 0;
+  Object.entries(balances).forEach(([a, b]) => {
+    if (a === 'Cash' || a.startsWith('Accounts Receivable') || a.startsWith('Inventory') || a.startsWith('Prepaid')) assets += b;
+    if (a.endsWith('Payable') || a === 'Loans Payable') liab += -b;
+    if (a === 'Equity') equity += -b;
+  });
+  csv += `Assets,${assets}\nLiabilities,${liab}\nEquity,${equity}\nTotal,${assets}\n\n`;
+
+  // --- Cash Flow ---
+  csv += "Cash Flow Statement\nDate,Description,Cash In,Cash Out\n";
+  let cashIn = 0, cashOut = 0;
+  state.transactions.forEach(t => {
+    if (t.debit === state.cashAccount) {
+      cashIn += t.amount;
+      csv += `${t.date},${t.desc},${t.amount},\n`;
+    }
+    if (t.credit === state.cashAccount) {
+      cashOut += t.amount;
+      csv += `${t.date},${t.desc},,${t.amount}\n`;
+    }
+  });
+  csv += `Total,,${cashIn},${cashOut}\n`;
+
+  // Download CSV
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'bookkeeping_full.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+};
 $('defaultCash').onchange=()=>{ state.cashAccount=$('defaultCash').value; saveState(); render(); };
 $('syncBtn').onclick = () => {saveToGitHub(state.transactions); };
 
@@ -232,4 +311,5 @@ if('serviceWorker' in navigator){ navigator.serviceWorker.register('service-work
 </body>
 
 </html>
+
 
